@@ -1,6 +1,6 @@
 use clap::{App, AppSettings, Arg};
 use eyre::{eyre, Result};
-use log::{debug, error};
+use log::{debug, error, info};
 use once_cell::sync::Lazy;
 use regex::{Captures, Regex};
 use std::fs;
@@ -39,11 +39,7 @@ fn main() -> Result<()> {
                 caps[1].to_string()
             )) {
                 Ok(url) => {
-                    debug!(
-                        "Added link to PR/ISSUE: {}\n url: {}",
-                        caps[1].to_string(),
-                        &url
-                    );
+                    debug!("Added link to PR/ISSUE: {}", &url);
                     format!("[#{}]({})", caps[1].to_string(), url)
                 }
                 Err(e) => {
@@ -62,6 +58,12 @@ fn get_url(try_url: String) -> Result<String> {
     let mut res = reqwest::blocking::get(&try_url).unwrap();
 
     while !res.status().is_success() && retries <= 15 {
+        info!(
+            "Retrying for URL: {}, code: {}, retry number: {}",
+            &try_url,
+            res.status().to_string(),
+            retries
+        );
         std::thread::sleep(Duration::from_millis(250 * retries));
         res = reqwest::blocking::get(&try_url).unwrap();
         retries = retries + 1;
