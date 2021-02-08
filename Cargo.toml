@@ -1,0 +1,15 @@
+[package]
+authors = ["Praveen Perera <praveen@avencera.com>"]
+edition = "2018"
+name = "linker"
+version = "0.1.0"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+clap = "2.33"
+color-eyre = "0.5"
+eyre = "0.6"
+once_cell = "1.5"
+regex = "1"
+reqwest = {version = "0.11", features = ["blocking"]}
