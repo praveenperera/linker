@@ -6,17 +6,16 @@ use std::fs;
 use std::path::Path;
 use std::time::Duration;
 
-static RE: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r#"https://github.com/clux/kube-rs/issues/([0-9]+)"#).unwrap());
+static RE: Lazy<Regex> = Lazy::new(|| Regex::new(r#"[\sa-zA-Z0-9]#([0-9]+)"#).unwrap());
 
 fn main() -> Result<()> {
     color_eyre::install()?;
 
-    let matches = App::new("RustyWind")
+    let matches = App::new("Linker")
         .version(clap::crate_version!())
         .setting(AppSettings::ArgRequiredElseHelp)
         .author("Praveen Perera <praveen@avencera.com>")
-        .about("\nOrganize all your tailwind classes")
+        .about("\nAutomatically link CHANGELOG.MD PRs and Issues")
         .arg(
             Arg::with_name("file")
                 .value_name("PATH")
@@ -33,28 +32,27 @@ fn main() -> Result<()> {
 
     let new_contents = RE
         .replace_all(&contents, |caps: &Captures| {
-            let res = reqwest::blocking::get(&format!(
+            let url = get_url(format!(
                 "https://github.com/clux/kube-rs/issues/{}",
                 caps[1].to_string()
-            ))
-            .unwrap();
+            ));
 
-            println!("STATUS: {:#?}, NUMBER: {}", res.status(), &caps[1]);
-
-            if res.status().is_success() {
-                std::thread::sleep(Duration::from_millis(1000));
-                res.url().to_string()
-            } else {
-                std::thread::sleep(Duration::from_millis(2000));
-                let res = reqwest::blocking::get(&format!(
-                    "https://github.com/clux/kube-rs/issues/{}",
-                    caps[1].to_string()
-                ))
-                .unwrap();
-                res.url().to_string()
-            }
+            format!("[#{}]({})", caps[1].to_string(), url)
         })
         .to_string();
 
     Ok(fs::write(file_path, new_contents.as_bytes())?)
+}
+
+fn get_url(try_url: String) -> String {
+    let mut retries = 1;
+    let mut res = reqwest::blocking::get(&try_url).unwrap();
+
+    while !res.status().is_success() {
+        std::thread::sleep(Duration::from_millis(250 * retries));
+        res = reqwest::blocking::get(&try_url).unwrap();
+        retries = retries + 1;
+    }
+
+    res.url().to_string()
 }
