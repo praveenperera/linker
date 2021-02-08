@@ -64,7 +64,7 @@ fn get_url(try_url: String) -> Result<String> {
             res.status().to_string(),
             retries
         );
-        std::thread::sleep(Duration::from_millis(750 + (250 * retries)));
+        std::thread::sleep(Duration::from_millis(2750 + (250 * retries)));
         res = reqwest::blocking::get(&try_url).unwrap();
         retries = retries + 1;
     }
