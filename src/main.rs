@@ -40,7 +40,7 @@ fn main() -> Result<()> {
             )) {
                 Ok(url) => {
                     debug!("Added link to PR/ISSUE: {}", &url);
-                    format!("[#{}]({})", caps[1].to_string(), url)
+                    format!(" [#{}]({})", caps[1].to_string(), url)
                 }
                 Err(e) => {
                     error!("{:?}", e);
