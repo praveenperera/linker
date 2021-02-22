@@ -3,18 +3,22 @@ use eyre::{bail, eyre, Result};
 use log::{debug, error, info};
 use once_cell::sync::Lazy;
 use regex::{Captures, Regex};
+use std::collections::HashMap;
 use std::fs;
 use std::path::Path;
 use std::time::Duration;
 
-static RE_ISSUES_PRS: Lazy<Regex> = Lazy::new(|| Regex::new(r#"[\sa-zA-Z0-9]#([0-9]+)"#).unwrap());
+static RE_ISSUES_PRS: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r#"([\(\sa-zA-Z0-9])#([0-9]+)"#).unwrap());
 
 static RE_CONTRIBUTORS: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r#"@([a-z0-9_-]+)([\s\n])"#).unwrap());
+    Lazy::new(|| Regex::new(r#"@([A-Za-z0-9_-]+)([\s\n\)])"#).unwrap());
 
 fn main() -> Result<()> {
     color_eyre::install()?;
     env_logger::init();
+
+    let mut valid_links: HashMap<String, (bool, String)> = HashMap::new();
 
     let matches = App::new("Linker")
         .version(clap::crate_version!())
@@ -57,14 +61,17 @@ fn main() -> Result<()> {
     let contents = fs::read_to_string(&file_path)?;
 
     let new_contents = RE_ISSUES_PRS.replace_all(&contents, |caps: &Captures| {
-        match get_url(format!(
-            "https://github.com/{}/issues/{}",
-            &repo,
-            caps[1].to_string()
-        )) {
+        match get_url(
+            format!(
+                "https://github.com/{}/issues/{}",
+                &repo,
+                caps[2].to_string()
+            ),
+            &mut valid_links,
+        ) {
             Ok(url) => {
                 debug!("Added link to PR/ISSUE: {}", &url);
-                format!(" [#{}]({})", caps[1].to_string(), url)
+                format!("{}[#{}]({})", caps[1].to_string(), caps[2].to_string(), url)
             }
             Err(e) => {
                 error!("{:?}", e);
@@ -75,23 +82,44 @@ fn main() -> Result<()> {
 
     let new_contents = RE_CONTRIBUTORS
         .replace_all(&new_contents, |caps: &Captures| {
-            format!(
-                "[@{}](https://github.com/{}){}",
-                caps[1].to_string(),
-                caps[1].to_string(),
-                caps[2].to_string()
-            )
+            match get_url(
+                format!("https://github.com/{}", caps[1].to_string()),
+                &mut valid_links,
+            ) {
+                Ok(url) => {
+                    debug!("Added link to contributor: {}", &url);
+                    format!(
+                        "[@{}](https://github.com/{}){}",
+                        caps[1].to_string(),
+                        caps[1].to_string(),
+                        caps[2].to_string()
+                    )
+                }
+                Err(e) => {
+                    error!("{:?}", e);
+                    caps[0].to_string()
+                }
+            }
         })
         .to_string();
 
     Ok(fs::write(file_path, new_contents.as_bytes())?)
 }
 
-fn get_url(try_url: String) -> Result<String> {
+fn get_url(try_url: String, valid_links: &mut HashMap<String, (bool, String)>) -> Result<String> {
+    if let Some((true, actual_url)) = valid_links.get(&try_url) {
+        debug!("{} was already found to be valid", &try_url);
+        return Ok(actual_url.to_string());
+    }
+
     let mut retries = 1;
     let mut res = reqwest::blocking::get(&try_url)?;
 
     while !res.status().is_success() && retries <= 15 {
+        if res.status() == 404 {
+            break;
+        }
+
         info!(
             "Retrying for URL: {}, code: {}, retry number: {}",
             &try_url,
@@ -104,8 +132,10 @@ fn get_url(try_url: String) -> Result<String> {
     }
 
     if res.status().is_success() {
+        valid_links.insert(try_url, (true, res.url().to_string()));
         Ok(res.url().to_string())
     } else {
-        Err(eyre!("Unable to get link for PR or issue"))
+        valid_links.insert(try_url.clone(), (false, "".to_string()));
+        Err(eyre!("Unable to get link for: {}", try_url))
     }
 }
