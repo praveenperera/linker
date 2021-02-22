@@ -9,7 +9,8 @@ use std::time::Duration;
 
 static RE_ISSUES_PRS: Lazy<Regex> = Lazy::new(|| Regex::new(r#"[\sa-zA-Z0-9]#([0-9]+)"#).unwrap());
 
-static RE_CONTRIBUTORS: Lazy<Regex> = Lazy::new(|| Regex::new(r#"@([a-z0-9_-]+)"#).unwrap());
+static RE_CONTRIBUTORS: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r#"@([a-z0-9_-]+)([\s\n])"#).unwrap());
 
 fn main() -> Result<()> {
     color_eyre::install()?;
@@ -75,9 +76,10 @@ fn main() -> Result<()> {
     let new_contents = RE_CONTRIBUTORS
         .replace_all(&new_contents, |caps: &Captures| {
             format!(
-                "[{}](https://github.com/{})",
-                caps[0].to_string(),
-                caps[1].to_string()
+                "[@{}](https://github.com/{}){}",
+                caps[1].to_string(),
+                caps[1].to_string(),
+                caps[2].to_string()
             )
         })
         .to_string();
