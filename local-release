@@ -1,0 +1,5 @@
+#!/bin/bash
+
+cargo build --release
+rm  /usr/local/bin/linker
+ln -s "$(pwd)/target/release/linker" /usr/local/bin
