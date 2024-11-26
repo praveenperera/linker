@@ -48,7 +48,7 @@ fn main() -> Result<()> {
         .trim_end()
         .trim_end_matches("/");
 
-    if !reqwest::blocking::get(&format!("https://github.com/{}", repo))
+    if !reqwest::blocking::get(format!("https://github.com/{}", repo))
         .unwrap()
         .status()
         .is_success()
@@ -65,13 +65,13 @@ fn main() -> Result<()> {
             format!(
                 "https://github.com/{}/issues/{}",
                 &repo,
-                caps[2].to_string()
+                &caps[2]
             ),
             &mut valid_links,
         ) {
             Ok(url) => {
                 debug!("Added link to PR/ISSUE: {}", &url);
-                format!("{}[#{}]({})", caps[1].to_string(), caps[2].to_string(), url)
+                format!("{}[#{}]({})", &caps[1], &caps[2], url)
             }
             Err(e) => {
                 error!("{:?}", e);
@@ -83,16 +83,16 @@ fn main() -> Result<()> {
     let new_contents = RE_CONTRIBUTORS
         .replace_all(&new_contents, |caps: &Captures| {
             match get_url(
-                format!("https://github.com/{}", caps[1].to_string()),
+                format!("https://github.com/{}", &caps[1]),
                 &mut valid_links,
             ) {
                 Ok(url) => {
                     debug!("Added link to contributor: {}", &url);
                     format!(
                         "[@{}](https://github.com/{}){}",
-                        caps[1].to_string(),
-                        caps[1].to_string(),
-                        caps[2].to_string()
+                        &caps[1],
+                        &caps[1],
+                        &caps[2]
                     )
                 }
                 Err(e) => {
@@ -128,7 +128,7 @@ fn get_url(try_url: String, valid_links: &mut HashMap<String, (bool, String)>) -
         );
         std::thread::sleep(Duration::from_millis(2750 + (250 * retries)));
         res = reqwest::blocking::get(&try_url)?;
-        retries = retries + 1;
+        retries += 1;
     }
 
     if res.status().is_success() {
