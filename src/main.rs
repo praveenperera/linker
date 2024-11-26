@@ -14,6 +14,9 @@ static RE_ISSUES_PRS: Lazy<Regex> =
 static RE_CONTRIBUTORS: Lazy<Regex> =
     Lazy::new(|| Regex::new(r#"@([A-Za-z0-9_-]+)([\s\n\)])"#).unwrap());
 
+static RE_COMMITS: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r"\b[a-f0-9]{40}\b|\b[a-f0-9]{6,8}\b").unwrap());
+
 fn main() -> Result<()> {
     color_eyre::install()?;
     env_logger::init();
@@ -28,7 +31,7 @@ fn main() -> Result<()> {
         .arg(
             Arg::with_name("file")
                 .value_name("PATH")
-                .help("A file  to run on")
+                .help("A file to run on")
                 .index(1)
                 .required(true)
                 .takes_value(true),
@@ -62,11 +65,7 @@ fn main() -> Result<()> {
 
     let new_contents = RE_ISSUES_PRS.replace_all(&contents, |caps: &Captures| {
         match get_url(
-            format!(
-                "https://github.com/{}/issues/{}",
-                &repo,
-                &caps[2]
-            ),
+            format!("https://github.com/{}/issues/{}", &repo, &caps[2]),
             &mut valid_links,
         ) {
             Ok(url) => {
@@ -82,17 +81,12 @@ fn main() -> Result<()> {
 
     let new_contents = RE_CONTRIBUTORS
         .replace_all(&new_contents, |caps: &Captures| {
-            match get_url(
-                format!("https://github.com/{}", &caps[1]),
-                &mut valid_links,
-            ) {
+            match get_url(format!("https://github.com/{}", &caps[1]), &mut valid_links) {
                 Ok(url) => {
                     debug!("Added link to contributor: {}", &url);
                     format!(
                         "[@{}](https://github.com/{}){}",
-                        &caps[1],
-                        &caps[1],
-                        &caps[2]
+                        &caps[1], &caps[1], &caps[2]
                     )
                 }
                 Err(e) => {
@@ -102,6 +96,22 @@ fn main() -> Result<()> {
             }
         })
         .to_string();
+
+    let new_contents = RE_COMMITS.replace_all(&new_contents, |caps: &Captures| {
+        match get_url(
+            format!("https://github.com/{}/commit/{}", &repo, &caps[0]),
+            &mut valid_links,
+        ) {
+            Ok(url) => {
+                debug!("Added link to commit: {}", &url);
+                format!("[{}]({})", &caps[0], url)
+            }
+            Err(e) => {
+                error!("{:?}", e);
+                caps[0].to_string()
+            }
+        }
+    });
 
     Ok(fs::write(file_path, new_contents.as_bytes())?)
 }

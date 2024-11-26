@@ -1,5 +1,6 @@
 #!/bin/bash
 
+path=$HOME/.local/bin/linker
 cargo build --release
-rm  /usr/local/bin/linker
-ln -s "$(pwd)/target/release/linker" /usr/local/bin
+rm  $path || true
+ln -s "$(pwd)/target/release/linker" $path
